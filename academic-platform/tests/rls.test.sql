@@ -1,0 +1,33 @@
+-- 7) Publication chain (states 1–3 must return 0 rows for a student):
+--    a) course draft + item published + material published
+--    b) course published + item draft + material published
+--    c) course published + item published + material draft
+--    For each, select the child with a student JWT → expect 0 rows, and
+--    app_private-equivalent chain check denies. State 4 must be readable.
+--
+-- ============================================================================
+-- Negative RLS tests — run against a TEST Supabase project only.
+-- Method: begin; set local request.jwt.claims to the test user's JWT;
+-- assert the operation FAILS; rollback. Requires supabase db test helpers.
+-- ============================================================================
+-- Examples of what MUST be denied for a student JWT:
+--
+-- 1) Reading another student's profile:
+--    select * from public.profiles where id <> auth.uid();  -- expect 0 rows
+--
+-- 2) Privilege escalation:
+--    update public.profiles set role = 'admin' where id = auth.uid();  -- expect exception
+--
+-- 3) Cross-semester course read (use a real course id from another semester):
+--    select * from public.courses where id = '<other-semester-course-uuid>';  -- expect 0 rows
+--
+-- 4) Writing academic content:
+--    insert into public.content_items (course_id, title, order_index)
+--    values ('<uuid>', 'x', 1);  -- expect RLS violation
+--
+-- 5) Reading a draft material directly:
+--    select * from public.content_materials where status = 'draft';  -- expect 0 rows
+--
+-- 6) Anonymous lookup access (must fail):
+--    select app_private.student_auth_email('2023001');  -- expect permission denied
+-- ============================================================================
