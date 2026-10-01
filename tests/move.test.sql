@@ -1,0 +1,31 @@
+-- ============================================================================
+-- tests/move.test.sql — move_item behavior (run on a TEST Supabase project).
+-- Prerequisites: admin JWT context, at least 3 items in the tested list.
+-- ============================================================================
+-- Happy path (with 3 items ordered 1,2,3):
+--   select public.move_item('course', '<id-of-order-2>', -1);
+--   → item moves to position 1, previous neighbor moves to 2.          [moving up]
+--   select public.move_item('course', '<id-of-order-2>', 1);
+--   → item moves to position 3, previous neighbor moves to 2.          [moving down]
+--
+-- Boundaries:
+--   move_item('course', '<first-item>', -1)  → no-op, no error         [first item]
+--   move_item('course', '<last-item>', 1)    → no-op, no error         [last item]
+--
+-- Invalid input:
+--   move_item('course', '<id>', 5)   → exception 'invalid delta'        [invalid move]
+--   move_item('bogus', '<id>', 1)    → exception 'unknown kind'
+--   move_item('course', '<random-uuid>', 1) → exception 'not found'
+--
+-- Duplicate ordering prevention (concurrency):
+--   Open two sessions; in both: begin; select public.move_item('course',
+--   '<id-a>', 1);  then commit both. The advisory lock serializes the two
+--   transactions; even if interleaving occurred, the DEFERRABLE UNIQUE
+--   constraint on (parent, order_index) makes the second commit fail with a
+--   unique violation — invalid ordering can never be persisted.
+--
+-- Idempotence/bounds check after any sequence of moves:
+--   select parent_id, order_index, count(*) from <table>
+--   group by parent_id, order_index having count(*) > 1;
+--   → must always return zero rows.
+-- ============================================================================
